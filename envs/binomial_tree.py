@@ -7,15 +7,15 @@ import math
 
 def encode_wealth(wealth, wealth_bins):
     '''Encodes the wealth from [0, +Inf) into the corresponding wealth_bin and returns the wealth_bin encoded as integer'''
-        return(pd.cut(x=[wealth], bins=wealth_bins, right=False, labels=False)[0])
+    return(pd.cut(x=[wealth], bins=wealth_bins, right=False, labels=False)[0])
     
 def encode_action(action, actions):
     '''Encodes an action as the corresponding index in actions'''
-        return(int(np.where(action == actions)[0][0]))
+    return(int(np.where(action == actions)[0][0]))
 
 def decode_action(action, actions):
     '''Decodes the index as the corresponding investment in the risky asset'''
-        return(actions[action])
+    return(actions[action])
     
 
 class BinomialTree(gym.Env):
