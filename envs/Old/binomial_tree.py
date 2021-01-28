@@ -22,7 +22,7 @@ class BinomialTree(gym.Env):
     '''Custom binomial stock price tree environment with one risky-asset and bank account'''
     metadata = {'render.modes': ['human']}
     
-    def __init__(self, up_prob, up_ret, down_ret, r, T, dt, V_0, actions, utility):
+    def __init__(self, up_prob, up_ret, down_ret, r, T, dt, V_0, actions, wealth_bins, utility):
         assert divmod(T, dt)[1] == 0        # To-Do: change to ValueError, is T 'ganzzahlig' divisible
         super().__init__()
         
@@ -35,7 +35,7 @@ class BinomialTree(gym.Env):
         self.V_0 = V_0                                      # Initial wealth
         self.actions = actions                              # possible actions, fraction of wealth invested in risky aset
         self.num_actions = len(self.actions)                # number of possible actions
-        #self.wealth_bins = wealth_bins                      # discrete wealth space
+        self.wealth_bins = wealth_bins                      # discrete wealth space
         self.utility = utility                              # "log" or "sqrt"
         
         self.reset()                                        # Set environment to initial state (0, V_0)
@@ -46,8 +46,8 @@ class BinomialTree(gym.Env):
         # Observation space
         self.observation_space = spaces.Tuple((
             spaces.Discrete(self.num_timesteps),
-            spaces.Box(low=np.array([0]), high=np.array([float("inf")])) ))
-        #self.num_observation_space = (self.num_timesteps + 1) * (len(wealth_bins) - 1)
+            spaces.Discrete(len(self.wealth_bins))))
+        self.num_observation_space = (self.num_timesteps + 1) * (len(wealth_bins) - 1)
         
     
     def step(self, action):
@@ -59,7 +59,6 @@ class BinomialTree(gym.Env):
         """
         
         assert self.action_space.contains(action)
-            
         pi_t = decode_action(action, self.actions)
         self.V_t *= pi_t * self.dt * (np.random.choice(a=self.returns, size=1, replace=False, p=self.probs)[0] - self.r) + (1 + self.dt*self.r)  # Update Wealth (see notes)
         self.time_state += 1      # updating time-step
@@ -79,7 +78,7 @@ class BinomialTree(gym.Env):
     
     def _get_obs(self):
         '''Get observation from environment'''
-        return (self.time_state, self.V_t)
+        return (self.time_state, encode_wealth(self.V_t, self.wealth_bins))
             
     def reset(self):
         '''Reset the state of the environment to an initial state'''

@@ -3,6 +3,9 @@ import numpy as np
 from gym import spaces
 import pandas as pd
 import math
+from mpl_toolkits.mplot3d import Axes3D  
+import matplotlib.pyplot as plt
+import random
 
 
 def encode_wealth(wealth, wealth_bins):
@@ -22,7 +25,7 @@ class BinomialTree(gym.Env):
     '''Custom binomial stock price tree environment with one risky-asset and bank account'''
     metadata = {'render.modes': ['human']}
     
-    def __init__(self, up_prob, up_ret, down_ret, r, T, dt, V_0, actions, wealth_bins, utility):
+    def __init__(self, up_prob, up_ret, down_ret, r, T, dt, V_0, actions, utility):
         assert divmod(T, dt)[1] == 0        # To-Do: change to ValueError, is T 'ganzzahlig' divisible
         super().__init__()
         
@@ -35,7 +38,7 @@ class BinomialTree(gym.Env):
         self.V_0 = V_0                                      # Initial wealth
         self.actions = actions                              # possible actions, fraction of wealth invested in risky aset
         self.num_actions = len(self.actions)                # number of possible actions
-        self.wealth_bins = wealth_bins                      # discrete wealth space
+        #self.wealth_bins = wealth_bins                      # discrete wealth space
         self.utility = utility                              # "log" or "sqrt"
         
         self.reset()                                        # Set environment to initial state (0, V_0)
@@ -46,8 +49,8 @@ class BinomialTree(gym.Env):
         # Observation space
         self.observation_space = spaces.Tuple((
             spaces.Discrete(self.num_timesteps),
-            spaces.Discrete(len(self.wealth_bins))))
-        self.num_observation_space = (self.num_timesteps + 1) * (len(wealth_bins) - 1)
+            spaces.Box(low=np.array([0]), high=np.array([float("inf")])) ))
+        #self.num_observation_space = (self.num_timesteps + 1) * (len(wealth_bins) - 1)
         
     
     def step(self, action):
@@ -59,6 +62,7 @@ class BinomialTree(gym.Env):
         """
         
         assert self.action_space.contains(action)
+            
         pi_t = decode_action(action, self.actions)
         self.V_t *= pi_t * self.dt * (np.random.choice(a=self.returns, size=1, replace=False, p=self.probs)[0] - self.r) + (1 + self.dt*self.r)  # Update Wealth (see notes)
         self.time_state += 1      # updating time-step
@@ -78,7 +82,7 @@ class BinomialTree(gym.Env):
     
     def _get_obs(self):
         '''Get observation from environment'''
-        return (self.time_state, encode_wealth(self.V_t, self.wealth_bins))
+        return (self.time_state, self.V_t)
             
     def reset(self):
         '''Reset the state of the environment to an initial state'''
@@ -90,3 +94,36 @@ class BinomialTree(gym.Env):
     #def render(self, mode='human', close=False):
     # Render the environment to the screen
     #...
+    
+
+def fun(x, y, Q, actions):
+    '''Help function used in plot_q_values'''
+    # Returns the Q-values for each state-action pair at time step 1.
+    return np.array([Q[(1,wealth)][encode_action(action, actions)] for action, wealth in zip(x,y)])
+    
+def plot_q_values(Q, actions):
+    '''Creates a 3d Wireframe plot of the Q-value function for each state-action pair and adds the predicted action (i.e. argmax_a Q(s,a)'''
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = actions
+    y = np.array(sorted([wealth for t, wealth in Q.keys() if t == 1]))
+    X, Y = np.meshgrid(x, y)
+    zs = np.array(fun(np.ravel(X), np.ravel(Y), Q, actions))
+    Z = zs.reshape(X.shape)
+
+    # Predicted Actions for each state
+    states = [key for key in Q.keys() if key[0] == 1]
+    predicted_actions = [decode_action(np.argmax(Q[state]), actions) for state in states]
+    wealths = [wealth for _, wealth in states]
+    predicted_Q_values = [Q[state][np.argmax(Q[state])] for state in states]
+
+    ax.plot_wireframe(X, Y, Z, color="black")
+
+    ax.set_xlabel('investment in risky asset')
+    ax.set_ylabel('wealth')
+    ax.set_zlabel('Q-values')
+    ax.scatter(predicted_actions, wealths, predicted_Q_values, zdir="z", c="red", alpha=1, label="Predicted Actions")
+    plt.title("Learned Q-value surface")
+    ax.legend()
+
+    plt.show()
