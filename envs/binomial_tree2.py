@@ -1,3 +1,5 @@
+'''Version with 2-dim observation space''' 
+
 import gym
 import numpy as np
 from gym import spaces
@@ -46,11 +48,11 @@ class BinomialTree(gym.Env):
         # Action space
         self.action_space = spaces.Discrete(self.num_actions)
         
-        # Observation space
-        self.observation_space = spaces.Tuple((
-            spaces.Discrete(self.num_timesteps),
-            spaces.Box(low=np.array([0]), high=np.array([float("inf")])) ))
-        #self.num_observation_space = (self.num_timesteps + 1) * (len(wealth_bins) - 1)
+        # Observation space np.array([t, V_t])
+        self.observation_space = spaces.Box(low = np.array([0, 0]), 
+                                            high = np.array([self.T, float("inf")]), 
+                                            shape = (2,),
+                                            dtype = np.float32)
         
     
     def step(self, action):
@@ -70,9 +72,9 @@ class BinomialTree(gym.Env):
         self.V_t *= pi_t * self.dt * (np.random.choice(a=self.returns, size=1, replace=False, p=self.probs)[0] - self.r) + (1 + self.dt*self.r)  # Update Wealth (see notes)
         
         # Update time-step
-        self.time_state += 1
+        self.t += self.dt
         
-        done = self.time_state == self.num_timesteps           # Episode is finished if termination time is reached
+        done = self.t == self.T                       # Episode is finished if termination time is reached
         
         reward = 0                                             # Reward is zero for each time step t<T
         if done:                                               # Reward at termination time R_T = U(V_T)
@@ -87,12 +89,12 @@ class BinomialTree(gym.Env):
     
     def _get_obs(self):
         '''Get observation from environment'''
-        return (self.time_state, self.V_t)
+        return np.array([self.t, self.V_t])
             
     def reset(self):
         '''Reset the state of the environment to an initial state'''
-        self.time_state   = 0                                          # setting time to zero
-        self.V_t          = self.V_0                                   # setting wealth to V_0
+        self.t   = 0                                          # setting time to zero
+        self.V_t = self.V_0                                   # setting wealth to V_0
         return self._get_obs()
     
     

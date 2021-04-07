@@ -67,21 +67,25 @@ class BinomialTree(gym.Env):
         pi_t = decode_action(action, self.actions)
         
         # Take one step according to binomial tree dynamics
-        self.V_t *= pi_t * self.dt * (np.random.choice(a=self.returns, size=1, replace=False, p=self.probs)[0] - self.r) + (1 + self.dt*self.r)  # Update Wealth (see notes)
+        next_V_t = self.V_t * ( pi_t * self.dt * (np.random.choice(a=self.returns, size=1, replace=False, p=self.probs)[0] - self.r) + (1 + self.dt*self.r) )  # Update Wealth (see notes)
         
         # Update time-step
         self.time_state += 1
         
         done = self.time_state == self.num_timesteps           # Episode is finished if termination time is reached
         
-        reward = 0                                             # Reward is zero for each time step t<T
-        if done:                                               # Reward at termination time R_T = U(V_T)
-            if self.utility == "log":                              # Logarithmic utility function
-                reward = np.log(self.V_t)
-            elif self.utility == "sqrt":                           # Square root utility function
-                reward = np.sqrt(self.V_t)
-            else:
-                raise ValueError("Utility function {} not implemented.".format(self.utility))
+        
+        # Immediate Reward (U(V_t+1) - U(V_t))                                 
+        if self.utility == "log":                              # Logarithmic utility function
+            reward = np.log(next_V_t) - np.log(self.V_t)
+        elif self.utility == "sqrt":                           # Square root utility function
+            reward = np.sqrt(next_V_t) - np.sqrt(self.V_t)
+        else:
+            raise ValueError("Utility function {} not implemented.".format(self.utility))
+            
+            
+        # Update wealth state
+        self.V_t = next_V_t
             
         return self._get_obs(), reward, done, {}          # {} empty info
     
